@@ -5,13 +5,12 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
-      - goetia_data:/app/data
-      - goetia_sessions:/app/sessions
+      # Храним данные и сессии в каталоге проекта на хосте
+      - ./data:/app/data
+      - ./sessions:/app/sessions
     env_file: .env
     command: ["sh", "-c", "pip install --no-cache-dir -r requirements.txt && python main.py"]
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
-volumes:
-  goetia_data:
-  goetia_sessions:
+# Удалены именованные volume, т.к. используются bind-монты выше
