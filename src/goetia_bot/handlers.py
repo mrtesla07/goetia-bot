@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from telethon import TelegramClient
+from aiogram.exceptions import TelegramBadRequest
 
 from .client_manager import AgentUsername
 from .context import AppContext
@@ -46,6 +47,18 @@ def setup_router(ctx: AppContext) -> Router:
             schedule_enabled=user.schedule_enabled if user else False,
         )
         await message.answer(await render_status(message.from_user.id), reply_markup=kb.as_markup())
+
+    async def refresh_menu(target_message: Message, user_id: int) -> None:
+        user = ctx.db.get_user(user_id)
+        kb = main_menu(
+            passthrough=user.passthrough if user else False,
+            schedule_enabled=user.schedule_enabled if user else False,
+        )
+        text = await render_status(user_id)
+        try:
+            await target_message.edit_text(text, reply_markup=kb.as_markup())
+        except TelegramBadRequest:
+            await target_message.answer(text, reply_markup=kb.as_markup())
 
     @router.message(CommandStart())
     async def cmd_start(message: Message, state: FSMContext) -> None:
@@ -191,6 +204,7 @@ def setup_router(ctx: AppContext) -> Router:
             except OSError as e:  # noqa: BLE001
                 logger.warning("Не смог удалить сессию %s: %s", session_path, e)
         await callback.message.answer("Сессия отключена. Чтобы подключить снова — /start")
+        await refresh_menu(callback.message, callback.from_user.id)
 
     @router.callback_query(F.data == "toggle_passthrough")
     async def cb_passthrough(callback: CallbackQuery, state: FSMContext) -> None:
@@ -199,10 +213,7 @@ def setup_router(ctx: AppContext) -> Router:
         user = ctx.db.upsert_user(callback.from_user.id)
         new_state = not user.passthrough
         ctx.db.set_passthrough(callback.from_user.id, new_state)
-        await callback.message.answer(
-            f"Passthrough теперь {'ON' if new_state else 'OFF'}. "
-            f"{'Будут приходить все сообщения.' if new_state else 'Только от @Agent_essence_bot.'}"
-        )
+        await refresh_menu(callback.message, callback.from_user.id)
 
     @router.callback_query(F.data == "toggle_schedule")
     async def cb_schedule(callback: CallbackQuery, state: FSMContext) -> None:
@@ -214,7 +225,7 @@ def setup_router(ctx: AppContext) -> Router:
         user = ctx.db.get_user(callback.from_user.id)
         if user:
             ctx.scheduler.schedule_user(user)
-        await callback.message.answer(f"Авто /buff {'включено' if new_state else 'выключено'}.")
+        await refresh_menu(callback.message, callback.from_user.id)
 
     @router.callback_query(F.data == "set_time")
     async def cb_set_time(callback: CallbackQuery, state: FSMContext) -> None:
@@ -235,7 +246,7 @@ def setup_router(ctx: AppContext) -> Router:
         if user:
             ctx.scheduler.schedule_user(user)
         await state.clear()
-        await message.answer(f"Время для /buff установлено: {text} (МСК)")
+        await refresh_menu(message, message.from_user.id)
 
     @router.message(F.text)
     async def forward_to_agent(message: Message, state: FSMContext) -> None:
