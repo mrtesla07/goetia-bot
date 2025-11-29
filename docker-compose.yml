@@ -5,9 +5,10 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
-      # Храним данные и сессии в каталоге проекта на хосте
+      # Храним данные, сессии и логи в каталоге проекта на хосте
       - ./data:/app/data
       - ./sessions:/app/sessions
+      - ./logs:/app/logs
     env_file: .env
     command: ["sh", "-c", "pip install --no-cache-dir -r requirements.txt && python main.py"]
     restart: unless-stopped

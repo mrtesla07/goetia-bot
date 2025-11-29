@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
@@ -14,19 +15,36 @@ from .handlers import setup_router
 from .scheduler import BuffScheduler
 
 
-def setup_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+def setup_logging(log_level: str, log_dir: Path) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.handlers.clear()
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(fmt)
+    stream_handler.setLevel(level)
+    root.addHandler(stream_handler)
+
+    file_handler = RotatingFileHandler(log_dir / "bot.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+    file_handler.setFormatter(fmt)
+    file_handler.setLevel(level)
+    root.addHandler(file_handler)
+
+    logging.getLogger("telethon").setLevel(max(level, logging.INFO))
+    logging.getLogger("aiogram.event").setLevel(max(level, logging.INFO))
 
 
 async def create_app() -> tuple[Dispatcher, AppContext]:
-    setup_logging()
     config = load_config()
+    setup_logging(config.log_level, config.logs_dir)
 
     config.data_dir.mkdir(parents=True, exist_ok=True)
     config.sessions_dir.mkdir(parents=True, exist_ok=True)
+    config.logs_dir.mkdir(parents=True, exist_ok=True)
 
     db = Database(config.data_dir / "goetia.db")
     bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode="HTML"))

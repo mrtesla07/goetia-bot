@@ -5,7 +5,7 @@
 ## Быстрый старт
 1. `python -m venv .venv && .venv\Scripts\activate`
 2. `pip install -r requirements.txt`
-3. Скопируйте `.env.example` в `.env` и заполните `BOT_TOKEN`, `API_ID`, `API_HASH` (при необходимости `TZ`, по умолчанию Europe/Moscow).
+3. Скопируйте `.env.example` в `.env` и заполните `BOT_TOKEN`, `API_ID`, `API_HASH` (при необходимости `TZ`, по умолчанию Europe/Moscow, и `LOG_LEVEL`, по умолчанию INFO).
 4. `python main.py` — запуск бота. Данные сохраняются в `data/goetia.db`, сессии Telethon — в `sessions/`.
 
 ## Функционал
@@ -19,3 +19,4 @@
 - `src/goetia_bot` — исходники бота.
 - `data/` — база SQLite.
 - `sessions/` — сессии MTProto-подключений пользователей.
+- `logs/` — файлы логов (`bot.log` с ротацией).
