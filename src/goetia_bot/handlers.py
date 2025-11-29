@@ -88,7 +88,7 @@ def setup_router(ctx: AppContext) -> Router:
             await state.clear()
             return
         await state.set_state(ConnectStates.waiting_code)
-        await message.answer("Код отправлен. Пришлите код из Telegram (6 цифр).")
+        await message.answer("Код отправлен. Пришлите код из Telegram (5–6 цифр), как в сообщении.")
 
     @router.message(ConnectStates.waiting_code)
     async def got_code(message: Message, state: FSMContext) -> None:
