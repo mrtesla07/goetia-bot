@@ -6,7 +6,7 @@ import pytest
 from goetia_bot.client_manager import ClientManager
 from goetia_bot.config import Config
 from goetia_bot.db import Database
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
 
 
 class FakeEvent:
@@ -26,6 +26,7 @@ class FakeClient:
         self.handlers = []
         self.require_password = False
         self.connected = False
+        self._hash = "hash1"
 
     async def connect(self):
         self.connected = True
@@ -33,12 +34,17 @@ class FakeClient:
     async def is_user_authorized(self):
         return self._authorized
 
-    async def send_code_request(self, phone):
+    async def send_code_request(self, phone, force_sms=False):
         self.phone = phone
+        if force_sms:
+            self._hash = "hash_sms"
+        return type("resp", (), {"phone_code_hash": self._hash})
 
-    async def sign_in(self, phone=None, code=None, password=None):
+    async def sign_in(self, phone=None, code=None, password=None, phone_code_hash=None):
         if code and self.require_password:
             raise SessionPasswordNeededError(request=None)
+        if phone_code_hash and phone_code_hash != self._hash:
+            raise PhoneCodeInvalidError(request=None)
         if password:
             self._authorized = True
         else:
@@ -69,8 +75,10 @@ def manager(tmp_path, monkeypatch, temp_dirs):
 
 @pytest.mark.asyncio
 async def test_finish_sign_in(manager: ClientManager):
-    client = await manager.start_with_code(tg_id=10, phone="+7000")
-    ok, password_needed = await manager.finish_sign_in(tg_id=10, client=client, phone="+7000", code="123456")
+    client, phone_code_hash = await manager.start_with_code(tg_id=10, phone="+7000")
+    ok, password_needed = await manager.finish_sign_in(
+        tg_id=10, client=client, phone="+7000", code="123456", phone_code_hash=phone_code_hash
+    )
     assert ok is True
     assert password_needed is False
     assert manager.has_client(10)
@@ -80,9 +88,11 @@ async def test_finish_sign_in(manager: ClientManager):
 @pytest.mark.asyncio
 async def test_finish_sign_in_with_password(manager: ClientManager):
     manager.db.upsert_user(11)
-    client = await manager.start_with_code(tg_id=11, phone="+7000")
+    client, phone_code_hash = await manager.start_with_code(tg_id=11, phone="+7000")
     client.require_password = True
-    ok, password_needed = await manager.finish_sign_in(tg_id=11, client=client, phone="+7000", code="123456")
+    ok, password_needed = await manager.finish_sign_in(
+        tg_id=11, client=client, phone="+7000", code="123456", phone_code_hash=phone_code_hash
+    )
     assert ok is False and password_needed is True
     ok2 = await manager.complete_with_password(tg_id=11, client=client, password="pwd")
     assert ok2 is True
@@ -91,8 +101,10 @@ async def test_finish_sign_in_with_password(manager: ClientManager):
 
 @pytest.mark.asyncio
 async def test_send_to_agent(manager: ClientManager):
-    client = await manager.start_with_code(tg_id=12, phone="+7000")
-    await manager.finish_sign_in(tg_id=12, client=client, phone="+7000", code="123456")
+    client, phone_code_hash = await manager.start_with_code(tg_id=12, phone="+7000")
+    await manager.finish_sign_in(
+        tg_id=12, client=client, phone="+7000", code="123456", phone_code_hash=phone_code_hash
+    )
     sent = await manager.send_to_agent(12, "ping")
     assert sent is True
     assert ("Agent_essence_bot", "ping") in client.sent_messages
@@ -107,8 +119,10 @@ async def test_handler_passthrough(manager: ClientManager):
 
     manager.set_message_callback(cb)
     manager.db.upsert_user(13)
-    client = await manager.start_with_code(tg_id=13, phone="+7000")
-    await manager.finish_sign_in(tg_id=13, client=client, phone="+7000", code="123456")
+    client, phone_code_hash = await manager.start_with_code(tg_id=13, phone="+7000")
+    await manager.finish_sign_in(
+        tg_id=13, client=client, phone="+7000", code="123456", phone_code_hash=phone_code_hash
+    )
     manager.db.set_passthrough(13, True)
     handler = client.handlers[0]
     await handler(FakeEvent("hello", username="Agent_essence_bot"))
@@ -125,8 +139,10 @@ async def test_non_agent_ignored(manager: ClientManager):
     manager.set_message_callback(cb)
     manager.db.upsert_user(14)
     manager.db.set_passthrough(14, True)
-    client = await manager.start_with_code(tg_id=14, phone="+7000")
-    await manager.finish_sign_in(tg_id=14, client=client, phone="+7000", code="123456")
+    client, phone_code_hash = await manager.start_with_code(tg_id=14, phone="+7000")
+    await manager.finish_sign_in(
+        tg_id=14, client=client, phone="+7000", code="123456", phone_code_hash=phone_code_hash
+    )
     handler = client.handlers[0]
     await handler(FakeEvent("hello", username="someone_else"))
     assert received == []

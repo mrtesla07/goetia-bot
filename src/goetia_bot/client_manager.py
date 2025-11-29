@@ -49,17 +49,18 @@ class ClientManager:
         client = TelegramClient(str(session_path), self.config.api_id, self.config.api_hash)
         await client.connect()
         logger.info("Отправляем код на %s (tg_id=%s)", phone, tg_id)
-        await client.send_code_request(phone)
-        return client
+        result = await client.send_code_request(phone)
+        return client, getattr(result, "phone_code_hash", None)
 
-    async def request_new_code(self, client: TelegramClient, tg_id: int, phone: str, force_sms: bool = False) -> None:
+    async def request_new_code(self, client: TelegramClient, tg_id: int, phone: str, force_sms: bool = False):
         logger.info(
             "Запрос нового кода force_sms=%s для tg_id=%s на %s",
             force_sms,
             tg_id,
             phone,
         )
-        await client.send_code_request(phone=phone, force_sms=force_sms)
+        result = await client.send_code_request(phone=phone, force_sms=force_sms)
+        return getattr(result, "phone_code_hash", None)
 
     async def finish_sign_in(
         self,
@@ -67,11 +68,12 @@ class ClientManager:
         client: TelegramClient,
         phone: str,
         code: str,
+        phone_code_hash: Optional[str] = None,
         password: Optional[str] = None,
     ) -> tuple[bool, bool]:
         password_needed = False
         try:
-            await client.sign_in(phone=phone, code=code)
+            await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
         except (PhoneCodeExpiredError, PhoneCodeInvalidError):
             logger.warning(
                 "Код истёк или неверный tg_id=%s phone=%s code_len=%s",

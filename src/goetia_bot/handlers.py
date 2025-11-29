@@ -80,8 +80,9 @@ def setup_router(ctx: AppContext) -> Router:
         phone = message.text.strip()
         await state.update_data(phone=phone)
         try:
-            client = await ctx.clients.start_with_code(message.from_user.id, phone)
+            client, phone_code_hash = await ctx.clients.start_with_code(message.from_user.id, phone)
             pending_clients[message.from_user.id] = client
+            await state.update_data(phone_code_hash=phone_code_hash)
         except Exception as e:  # noqa: BLE001
             logger.exception("Ошибка отправки кода: %s", e)
             await message.answer(f"Не удалось отправить код: {e}")
@@ -102,7 +103,11 @@ def setup_router(ctx: AppContext) -> Router:
         code = message.text.strip().replace(" ", "")
         try:
             ok, password_needed = await ctx.clients.finish_sign_in(
-                message.from_user.id, client, phone=phone, code=code
+                message.from_user.id,
+                client,
+                phone=phone,
+                code=code,
+                phone_code_hash=data.get("phone_code_hash"),
             )
         except Exception as e:  # noqa: BLE001
             logger.exception(
@@ -119,7 +124,10 @@ def setup_router(ctx: AppContext) -> Router:
         if not ok and not password_needed:
             await message.answer("Код неверный или просрочен. Я выслал новый код, пришлите его сюда.")
             try:
-                await ctx.clients.request_new_code(client, message.from_user.id, phone, force_sms=True)
+                phone_code_hash = await ctx.clients.request_new_code(
+                    client, message.from_user.id, phone, force_sms=True
+                )
+                await state.update_data(phone_code_hash=phone_code_hash)
             except Exception as e:  # noqa: BLE001
                 logger.exception("Не удалось запросить новый код: %s", e)
                 await message.answer(f"Не удалось запросить новый код: {e}")
