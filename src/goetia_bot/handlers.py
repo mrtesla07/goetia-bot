@@ -105,7 +105,13 @@ def setup_router(ctx: AppContext) -> Router:
                 message.from_user.id, client, phone=phone, code=code
             )
         except Exception as e:  # noqa: BLE001
-            logger.exception("Ошибка авторизации: %s", e)
+            logger.exception(
+                "Ошибка авторизации tg_id=%s phone=%s code_len=%s: %s",
+                message.from_user.id,
+                phone,
+                len(code),
+                e,
+            )
             await message.answer(f"Не удалось авторизоваться: {e}")
             await state.clear()
             return
@@ -113,7 +119,7 @@ def setup_router(ctx: AppContext) -> Router:
         if not ok and not password_needed:
             await message.answer("Код неверный или просрочен. Я выслал новый код, пришлите его сюда.")
             try:
-                await client.send_code_request(phone)
+                await ctx.clients.request_new_code(client, message.from_user.id, phone, force_sms=True)
             except Exception as e:  # noqa: BLE001
                 logger.exception("Не удалось запросить новый код: %s", e)
                 await message.answer(f"Не удалось запросить новый код: {e}")

@@ -4,7 +4,12 @@ from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional
 
 from telethon import TelegramClient, events
-from telethon.errors import SessionPasswordNeededError, PhoneCodeExpiredError, PhoneCodeInvalidError
+from telethon.errors import (
+    SessionPasswordNeededError,
+    PhoneCodeExpiredError,
+    PhoneCodeInvalidError,
+    RPCError,
+)
 
 from .config import Config
 from .db import Database, UserRecord
@@ -43,8 +48,18 @@ class ClientManager:
         session_path = self._session_path_for(tg_id)
         client = TelegramClient(str(session_path), self.config.api_id, self.config.api_hash)
         await client.connect()
+        logger.info("Отправляем код на %s (tg_id=%s)", phone, tg_id)
         await client.send_code_request(phone)
         return client
+
+    async def request_new_code(self, client: TelegramClient, tg_id: int, phone: str, force_sms: bool = False) -> None:
+        logger.info(
+            "Запрос нового кода force_sms=%s для tg_id=%s на %s",
+            force_sms,
+            tg_id,
+            phone,
+        )
+        await client.send_code_request(phone=phone, force_sms=force_sms)
 
     async def finish_sign_in(
         self,
@@ -58,14 +73,30 @@ class ClientManager:
         try:
             await client.sign_in(phone=phone, code=code)
         except (PhoneCodeExpiredError, PhoneCodeInvalidError):
+            logger.warning(
+                "Код истёк или неверный tg_id=%s phone=%s code_len=%s",
+                tg_id,
+                phone,
+                len(code),
+            )
             return False, False
         except SessionPasswordNeededError:
             password_needed = True
             if not password:
                 return False, True
             await client.sign_in(password=password)
+        except RPCError as e:
+            logger.error(
+                "RPC ошибка при sign_in tg_id=%s phone=%s code_len=%s: %s",
+                tg_id,
+                phone,
+                len(code),
+                e,
+            )
+            raise
 
         if not await client.is_user_authorized():
+            logger.warning("Не авторизован после sign_in tg_id=%s", tg_id)
             return False, password_needed
 
         self._register_handlers(client, tg_id)
