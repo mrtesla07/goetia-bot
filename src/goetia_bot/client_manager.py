@@ -9,6 +9,7 @@ from telethon.errors import (
     PhoneCodeExpiredError,
     PhoneCodeInvalidError,
     RPCError,
+    AuthRestartError,
 )
 
 from .config import Config
@@ -49,8 +50,24 @@ class ClientManager:
         client = TelegramClient(str(session_path), self.config.api_id, self.config.api_hash)
         await client.connect()
         logger.info("Отправляем код на %s (tg_id=%s)", phone, tg_id)
-        result = await client.send_code_request(phone)
-        return client, getattr(result, "phone_code_hash", None)
+        last_exc: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                result = await client.send_code_request(phone)
+                return client, getattr(result, "phone_code_hash", None)
+            except AuthRestartError as e:
+                last_exc = e
+                logger.warning("AuthRestartError при отправке кода, повтор #%s tg_id=%s", attempt, tg_id)
+                await client.disconnect()
+                await client.connect()
+            except ConnectionError as e:
+                last_exc = e
+                logger.warning("Проблема соединения при отправке кода, повтор #%s tg_id=%s", attempt, tg_id)
+                await client.disconnect()
+                await client.connect()
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("Не удалось отправить код")
 
     async def request_new_code(self, client: TelegramClient, tg_id: int, phone: str, force_sms: bool = False):
         logger.info("Запрос нового кода force_sms=%s для tg_id=%s на %s", force_sms, tg_id, phone)
