@@ -26,7 +26,7 @@ class FakeClient:
         self.handlers = []
         self.require_password = False
         self.connected = False
-        self._hash = "hash1"
+        self._hash_counter = 0
 
     async def connect(self):
         self.connected = True
@@ -36,14 +36,16 @@ class FakeClient:
 
     async def send_code_request(self, phone, force_sms=False):
         self.phone = phone
-        if force_sms:
-            self._hash = "hash_sms"
-        return type("resp", (), {"phone_code_hash": self._hash})
+        self._hash_counter += 1
+        current_hash = f"hash{self._hash_counter}"
+        return type("resp", (), {"phone_code_hash": current_hash})
 
     async def sign_in(self, phone=None, code=None, password=None, phone_code_hash=None):
         if code and self.require_password:
             raise SessionPasswordNeededError(request=None)
-        if phone_code_hash and phone_code_hash != self._hash:
+        # require correct hash if provided
+        expected_hash = f"hash{self._hash_counter}"
+        if phone_code_hash and phone_code_hash != expected_hash:
             raise PhoneCodeInvalidError(request=None)
         if password:
             self._authorized = True

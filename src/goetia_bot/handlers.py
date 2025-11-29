@@ -125,7 +125,7 @@ def setup_router(ctx: AppContext) -> Router:
             await message.answer("Код неверный или просрочен. Я выслал новый код, пришлите его сюда.")
             try:
                 phone_code_hash = await ctx.clients.request_new_code(
-                    client, message.from_user.id, phone, force_sms=True
+                    client, message.from_user.id, phone, force_sms=False
                 )
                 await state.update_data(phone_code_hash=phone_code_hash)
             except Exception as e:  # noqa: BLE001

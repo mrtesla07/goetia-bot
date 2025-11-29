@@ -44,7 +44,7 @@ class ClientManager:
         logger.info("Telethon клиент поднят для %s", tg_id)
         return client
 
-    async def start_with_code(self, tg_id: int, phone: str) -> TelegramClient:
+    async def start_with_code(self, tg_id: int, phone: str) -> tuple[TelegramClient, Optional[str]]:
         session_path = self._session_path_for(tg_id)
         client = TelegramClient(str(session_path), self.config.api_id, self.config.api_hash)
         await client.connect()
@@ -53,12 +53,7 @@ class ClientManager:
         return client, getattr(result, "phone_code_hash", None)
 
     async def request_new_code(self, client: TelegramClient, tg_id: int, phone: str, force_sms: bool = False):
-        logger.info(
-            "Запрос нового кода force_sms=%s для tg_id=%s на %s",
-            force_sms,
-            tg_id,
-            phone,
-        )
+        logger.info("Запрос нового кода force_sms=%s для tg_id=%s на %s", force_sms, tg_id, phone)
         result = await client.send_code_request(phone=phone, force_sms=force_sms)
         return getattr(result, "phone_code_hash", None)
 
@@ -76,10 +71,11 @@ class ClientManager:
             await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
         except (PhoneCodeExpiredError, PhoneCodeInvalidError):
             logger.warning(
-                "Код истёк или неверный tg_id=%s phone=%s code_len=%s",
+                "Код истёк или неверный tg_id=%s phone=%s code_len=%s hash=%s",
                 tg_id,
                 phone,
                 len(code),
+                phone_code_hash,
             )
             return False, False
         except SessionPasswordNeededError:
