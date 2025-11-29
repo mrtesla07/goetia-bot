@@ -109,8 +109,24 @@ async def test_handler_passthrough(manager: ClientManager):
     manager.db.upsert_user(13)
     client = await manager.start_with_code(tg_id=13, phone="+7000")
     await manager.finish_sign_in(tg_id=13, client=client, phone="+7000", code="123456")
-    user = manager.db.get_user(13)
     manager.db.set_passthrough(13, True)
     handler = client.handlers[0]
-    await handler(FakeEvent("hello", username="someone"))
-    assert received == [(13, "someone", "hello")]
+    await handler(FakeEvent("hello", username="Agent_essence_bot"))
+    assert received == [(13, "agent_essence_bot", "hello")]
+
+
+@pytest.mark.asyncio
+async def test_non_agent_ignored(manager: ClientManager):
+    received = []
+
+    async def cb(tg_id, sender, text):
+        received.append((tg_id, sender, text))
+
+    manager.set_message_callback(cb)
+    manager.db.upsert_user(14)
+    manager.db.set_passthrough(14, True)
+    client = await manager.start_with_code(tg_id=14, phone="+7000")
+    await manager.finish_sign_in(tg_id=14, client=client, phone="+7000", code="123456")
+    handler = client.handlers[0]
+    await handler(FakeEvent("hello", username="someone_else"))
+    assert received == []

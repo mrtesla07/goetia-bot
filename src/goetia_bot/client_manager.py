@@ -124,7 +124,10 @@ class ClientManager:
             username = (getattr(sender, "username", "") or "").lower()
             text = event.message.message or ""
 
-            if not user.passthrough and username != AgentUsername.lower():
+            if username != AgentUsername.lower():
+                return
+
+            if not user.passthrough:
                 return
 
             if not text:

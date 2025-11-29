@@ -122,6 +122,7 @@ def setup_router(ctx: AppContext) -> Router:
 
         pending_clients.pop(message.from_user.id, None)
         user = ctx.db.upsert_user(message.from_user.id)
+        ctx.db.set_passthrough(message.from_user.id, True)
         await state.clear()
         await message.answer("✅ Подключено. Теперь все ваши сообщения пойдут в @Agent_essence_bot.")
         await show_menu(message, user)
@@ -147,6 +148,7 @@ def setup_router(ctx: AppContext) -> Router:
             return
         pending_clients.pop(message.from_user.id, None)
         user = ctx.db.upsert_user(message.from_user.id)
+        ctx.db.set_passthrough(message.from_user.id, True)
         await state.clear()
         await message.answer("✅ Подключено с 2FA. Можно пользоваться.")
         await show_menu(message, user)
