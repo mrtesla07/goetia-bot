@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional
 
 from telethon import TelegramClient, events
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, PhoneCodeExpiredError, PhoneCodeInvalidError
 
 from .config import Config
 from .db import Database, UserRecord
@@ -57,6 +57,8 @@ class ClientManager:
         password_needed = False
         try:
             await client.sign_in(phone=phone, code=code)
+        except (PhoneCodeExpiredError, PhoneCodeInvalidError):
+            return False, False
         except SessionPasswordNeededError:
             password_needed = True
             if not password:

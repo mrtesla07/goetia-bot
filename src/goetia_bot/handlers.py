@@ -110,6 +110,17 @@ def setup_router(ctx: AppContext) -> Router:
             await state.clear()
             return
 
+        if not ok and not password_needed:
+            await message.answer("Код неверный или просрочен. Я выслал новый код, пришлите его сюда.")
+            try:
+                await client.send_code_request(phone)
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Не удалось запросить новый код: %s", e)
+                await message.answer(f"Не удалось запросить новый код: {e}")
+                await state.clear()
+                return
+            return
+
         if password_needed and not ok:
             await state.set_state(ConnectStates.waiting_password)
             await message.answer("Включена 2FA. Пришлите пароль от Telegram.")
