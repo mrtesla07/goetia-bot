@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from .client_manager import ClientManager
@@ -28,7 +29,7 @@ async def create_app() -> tuple[Dispatcher, AppContext]:
     config.sessions_dir.mkdir(parents=True, exist_ok=True)
 
     db = Database(config.data_dir / "goetia.db")
-    bot = Bot(token=config.bot_token, parse_mode="HTML")
+    bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
     clients = ClientManager(config, db)
     scheduler = BuffScheduler(config, db, clients)
     ctx = AppContext(config=config, db=db, clients=clients, scheduler=scheduler, bot=bot)
